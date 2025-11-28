@@ -1,0 +1,55 @@
+<html>
+<head>
+<title>OIDC Login Page | demo.cdc.com</title>
+    <script type="text/javascript" src="https://cdns.us1.gigya.com/js/gigya.js?apiKey=4_S2nqbib5zmlDXhDef3Yhbw"></script>
+    <style>
+        html, body {
+            margin: 0px;
+            padding: 25px;
+            color: #8a8a8a;
+
+        }
+        #errorsDiv {
+            display: none;
+        }
+        #main_wrapper {
+            display: block;
+
+        }
+
+        .container {
+            text-align: center;
+            margin: 0px auto !important;
+            width: 100%;
+        }
+        h1.gigya-screen-caption {
+            float: left !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="" id="logoDiv">
+        <img src="GigyaLogo_2016-05-04.png" />
+    </div>
+    <h2>CDC OIDC OP Login Page</h2>
+    <div id="container"></div>
+    <script>
+        function redirectToProxy() {
+            var url = gigya.utils.URL.addParamsToURL("proxy.html",{
+                mode: 'afterLogin'
+            });
+            window.location.href = url;
+        }
+        gigya.socialize.addEventHandlers({
+            onLogin: function() {
+                redirectToProxy();
+            }
+        });
+        gigya.accounts.showScreenSet({
+                screenSet: 'Default-RegistrationLogin',
+                containerID: "container",
+                sessionExpiration: '14400' // 4 hours
+        });
+    </script>
+</body>
+</html>

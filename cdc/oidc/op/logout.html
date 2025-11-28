@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SAP CDC Logout Success</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        :root { --primary-blue: #0070f2; --sap-red: #d9001b; --dark-bg: #f4f4f4; }
+        body { font-family: sans-serif; background-color: var(--dark-bg); text-align: center; padding-top: 50px; }
+        .container { background: #fff; padding: 40px; border-radius: 8px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: var(--sap-red); margin-bottom: 20px; }
+        p { color: #555; }
+        .code-msg { margin-top: 20px; padding: 10px; background: #e0e0e0; border-radius: 4px; font-family: monospace; }
+        .rpBtn { background-color: var(--primary-blue); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px; transition: background-color 0.2s; }
+        .rpBtn:hover { background-color: #0056b3; }
+    </style>
+    <script>
+        var apiKey = '';
+        var dataCenter = 'us1'; // Default
+        
+        // This function attempts to extract the required settings from the URL parameters
+        function getSettingsFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            apiKey = params.get('apiKey') || localStorage.getItem('cdc_logout_apiKey') || '';
+            dataCenter = params.get('dataCenter') || localStorage.getItem('cdc_logout_dataCenter') || 'us1';
+            
+            // Store locally for future direct access if user reloads
+            if (apiKey) localStorage.setItem('cdc_logout_apiKey', apiKey);
+            if (dataCenter) localStorage.setItem('cdc_logout_dataCenter', dataCenter);
+        }
+
+        function loadGigyaSDK() {
+            if (!apiKey) return;
+            const scriptSrc = `https://cdns.${dataCenter}.gigya.com/js/gigya.js?apiKey=${apiKey}`;
+            window.gigyaCmsFunctions = { dataCenter: dataCenter };
+            
+            $.getScript(scriptSrc, function() {
+                console.log('Gigya SDK Loaded.');
+                // Perform local logout cleanup after SDK loads
+                if (typeof gigya !== 'undefined') {
+                    gigya.accounts.logout({ callback: onLogoutComplete });
+                }
+            }).fail(function() {
+                console.error("Failed to load Gigya SDK. Local session cleanup may not occur.");
+                document.getElementById('status').innerText = "Logout successful, but local session cleanup failed (SDK load error).";
+            });
+        }
+        
+        function onLogoutComplete(response) {
+            if (response.errorCode === 0) {
+                console.log("Local SDK logout completed successfully.");
+            } else {
+                console.warn("SDK Logout failed or was redundant:", response.errorMessage);
+            }
+            document.getElementById('status').innerText = "Logout Complete. You are logged out of the OP and the website session.";
+        }
+
+        $(document).ready(function() {
+            getSettingsFromUrl();
+            loadGigyaSDK();
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>User Session Ended</h1>
+        <p id="status">Initiating session cleanup...</p>
+        <div class="code-msg">
+            This page acts as the **Post Logout Redirect URI**.
+        </div>
+        <p>Return to the main application to start a new flow.</p>
+        <button class="rpBtn" onclick="window.location.href = window.location.href.split('?')[0].split('#')[0].replace('/OIDCLogoutPage.html', '/index.html')">Return to Main Tester</button>
+    </div>
+</body>
+</html>

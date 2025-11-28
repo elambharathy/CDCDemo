@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html>
+    <head>
+      <title>SAP CDC OIDC Demo - RP Test Page</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <!-- Upgraded jQuery for better stability in testing -->
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+      
+      <style type='text/css'>
+        /* --- General Layout & Aesthetics --- */
+        :root {
+            --primary-blue: #0070f2;
+            --primary-dark: #0056b3;
+            --dark-bg: #2b2b2b;
+            --dark-text: #a9b7c6;
+            --input-border: #ccc;
+        }
+        body { font-family: sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
+        #main_wrapper { background: #fff; padding: 30px; border-radius: 8px; max-width: 600px; margin: 0 auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-top: 0; }
+        input[type="text"], select { margin-bottom: 10px; padding: 8px; border: 1px solid var(--input-border); border-radius: 4px; width: 100%; box-sizing: border-box; }
+        .rpBtn { background-color: var(--primary-blue); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px 0; transition: background-color 0.2s; }
+        .rpBtn:hover { background-color: var(--primary-dark); }
+        h4 { margin: 5px 0; padding: 8px; background-color: #e9f0ff; border-left: 5px solid var(--primary-blue); font-size: 1em; overflow-wrap: break-word; word-break: break-all; }
+        #warn { background-color: #ffcc80; border-left-color: #ff9800; }
+        .input-group { margin-bottom: 15px; }
+        .server-side-logic { background-color: #fff3c9; border: 1px dashed #d6a100; padding: 10px; margin-top: 10px; }
+        .logout-btn { background-color: #d9001b; }
+        .logout-btn:hover { background-color: #b00015; }
+        .btn-group { display: flex; justify-content: space-between; margin-bottom: 10px; }
+
+        /* --- Token Input Styling (Embedded Copy Button) --- */
+        .token-input-group { margin-bottom: 15px; }
+        .token-input-group label { display: block; font-weight: bold; margin-bottom: 3px; font-size: 0.9em; }
+        .token-input-wrapper { 
+            display: flex; 
+            align-items: stretch; /* Stretch children to fill height */
+            position: relative;
+        }
+        .token-input-wrapper input[type="text"] { 
+            flex-grow: 1; 
+            margin-bottom: 0; 
+            padding-right: 40px; /* Space for the icon */
+            border-radius: 4px;
+        }
+        .copy-icon { 
+            position: absolute;
+            right: 1px;
+            top: 1px;
+            bottom: 1px;
+            width: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border-left: 1px solid var(--input-border);
+            cursor: pointer; 
+            border-radius: 0 4px 4px 0;
+            transition: background-color 0.1s;
+        }
+        .copy-icon:hover { background-color: #f0f0f0; }
+        .copy-icon svg { width: 18px; height: 18px; display: block; fill: var(--primary-blue); }
+
+        /* --- Unified Output Console --- */
+        #output_console { 
+            width: 100%; 
+            min-height: 300px; 
+            background-color: var(--dark-bg); 
+            color: var(--dark-text); 
+            border: 1px solid #333; 
+            padding: 15px; 
+            box-sizing: border-box; 
+            font-family: monospace; 
+            font-size: 0.9em; 
+            margin-top: 10px; 
+            border-radius: 4px;
+            resize: vertical; 
+        }
+      </style>
+
+      <script type="text/javascript">
+        var code = "";
+        var access_token_type = "";
+        var access_token = "";
+        var refresh_token = "";
+        var id_token = "";
+        var params = urlParams();
+
+        // --- Core Startup Logic ---
+        $(document).ready(function () {
+          code = params['code'];
+          if (code) {
+              $('#code').text('Code Received: ' + code);
+              $('#warn').text('Step 1 Success! Proceed to Step 2: Get Tokens.');
+          } else {
+              $('#code').text('Code Received: N/A');
+              $('#warn').text('Error or Reset. Start Auth Flow from the main website.');
+          }
+        });
+        
+        // Helper to copy text to clipboard (used by the native button attributes)
+        function copyText(elementId) {
+            const input = document.getElementById(elementId);
+            if (!input || !input.value) {
+                alert("Token not available to copy.");
+                return;
+            }
+            // Use execCommand for broader compatibility in testing environment
+            navigator.clipboard.writeText(input.value).then(() => {
+                const originalPlaceholder = input.placeholder;
+                input.placeholder = 'Copied!';
+                setTimeout(() => { input.placeholder = originalPlaceholder; }, 800);
+            }).catch(err => {
+                console.error('Could not copy text: ', err);
+                alert('Copy failed. Check console.');
+            });
+        }
+
+        // Function to parse URL parameters (Unchanged)
+        function urlParams() {
+          var queryString = location.hash || location.search;
+          if (queryString.indexOf('?') > -1) queryString = queryString.substring(queryString.indexOf('?') + 1);
+          if (queryString.indexOf('#') > -1) queryString = queryString.substring(queryString.indexOf('#') + 1);
+          
+          var queryParts = queryString.split(/&/);
+          var params = {};
+          for (var i = 0; i < queryParts.length; ++i) {
+              var param = queryParts[i];
+              if (param.indexOf('=') === -1) continue;
+              var paramParts = param.split('=');
+              if (paramParts.length !== 2) continue;
+              params[paramParts[0]] = decodeURIComponent(paramParts[1].replace(/\+/g, ' '));
+          }
+          return params;
+        }
+        
+        // Helper to decode URL-safe Base64 strings (JWT standard).
+        function urlBase64Decode(str) {
+            let output = str.replace(/-/g, '+').replace(/_/g, '/');
+            switch (output.length % 4) {
+                case 0: break;
+                case 2: output += '=='; break;
+                case 3: output += '='; break;
+                default:
+                    throw new Error('Illegal base64url string!');
+            }
+            return decodeURIComponent(window.atob(output).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+        }
+        
+        // ----------------------------------------------------------------------
+        // ** SECURITY WARNING: THIS FUNCTION MUST RUN ON A SECURE SERVER **
+        // ----------------------------------------------------------------------
+        // Get Token (Step 2: Server-Side Simulation)
+        function getTokenId() {
+          var dataCenter = $('#dataCenter').val().replace('.gigya.com', '');
+          var apiKeyOp = $('#apiKeyOp').val();
+          var clientId = $('#client_id').val();
+          var clientSecret = $('#client_secret').val();
+          var grantType = $('#grant_type').val();
+          var redirectURL = window.location.href.split('?')[0].split('#')[0];
+          
+          if (!clientId || !clientSecret || (!code && grantType === 'authorization_code') || (!refresh_token && grantType === 'refresh_token')) {
+              alert('Missing Client ID, Secret, or necessary token/code.');
+              return;
+          }
+
+          var tokenEndpointLink = `https://fidm.${dataCenter}.gigya.com/oidc/op/v1.0/${apiKeyOp}/token`;
+          var postData = `grant_type=${grantType}&redirect_uri=${encodeURIComponent(redirectURL)}`;
+          
+          if (grantType === 'authorization_code') {
+            postData += `&code=${encodeURIComponent(code)}`;
+          } else if (grantType === 'refresh_token') {
+            postData += `&refresh_token=${encodeURIComponent(refresh_token)}`;
+          }
+          
+          $('#warn').text('Exchanging token... (Simulating Server POST)');
+          
+          // --- API Call Logging ---
+          const apiCall = `POST ${tokenEndpointLink}`;
+          $('#output_console').val(`${apiCall}\n\n[RESPONSE BODY]...`);
+          // --- End API Call Logging ---
+
+          // Simulating the secure server-side POST exchange
+          $.ajax({
+              url: tokenEndpointLink,
+              type: 'POST',
+              crossDomain: true,
+              data: postData,
+              xhrFields: {
+                  withCredentials: true
+              },
+              beforeSend: function (xhr) {
+                  // Basic Auth for Client ID and Secret (NEVER EXPOSE IN CLIENT JS)
+                  xhr.setRequestHeader('Authorization', 'Basic ' + btoa(clientId + ":" + clientSecret));
+                  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+              },
+              success: function(res) {
+                  console.log('Token Response:', res);
+                  if (res.access_token) {
+                      access_token_type = res.token_type;
+                      access_token = res.access_token;
+                      refresh_token = res.refresh_token || refresh_token; 
+                      id_token = res.id_token;
+
+                      // Update input fields
+                      $('#access_token_input').val(access_token);
+                      $('#refresh_token_input').val(refresh_token || '');
+                      $('#id_token_input').val(id_token || '');
+                      $('#access_token_type').text('Access Token Type: ' + access_token_type);
+                      
+                      $('#warn').text('Token Exchange SUCCESS! Tokens received. Proceed to validation.');
+                      $('#output_console').val(apiCall + '\n\n[RESPONSE BODY]\n' + JSON.stringify(res, null, 2));
+
+                  } else {
+                      $('#warn').text('Token Exchange FAILED.');
+                      $('#output_console').val(apiCall + '\n\n[RESPONSE BODY]\n' + JSON.stringify(res, null, 2));
+                      alert("Token Exchange Failed.");
+                  }
+              },
+              error: function (xhr, status, error) {
+                  $('#warn').text('Token Exchange FAILED (Network/CORS).');
+                  $('#output_console').val(apiCall + `\n\n[ERROR: HTTP ${xhr.status} ${xhr.statusText}]\n` + xhr.responseText);
+                  console.error("Token Exchange Error:", xhr.responseText);
+                  alert("Token Exchange Failed: Check console for error.");
+              }
+          });
+        }
+        
+        // ----------------------------------------------------------------------
+        // ** SECURITY WARNING: THIS FUNCTION MUST RUN ON A SECURE SERVER **
+        // ----------------------------------------------------------------------
+        // Get user info (Step 3: Access Protected Resource)
+        function getUserInfo() {
+          if (!access_token) {
+              alert('Access Token is missing. Run "Get Token" first.');
+              return;
+          }
+
+          var dataCenter = $('#dataCenter').val().replace('.gigya.com', '');
+          var apiKeyOp = $('#apiKeyOp').val();
+          var userinfoEndpointLink = `https://fidm.${dataCenter}.gigya.com/oidc/op/v1.0/${apiKeyOp}/userinfo`;
+          
+          // --- API Call Logging ---
+          const apiCall = `GET ${userinfoEndpointLink}`;
+          $('#output_console').val(`${apiCall}\n\n[RESPONSE BODY]...`);
+          // --- End API Call Logging ---
+
+          $.ajax({
+              url: userinfoEndpointLink,
+              type: 'GET', 
+              crossDomain: true,
+              beforeSend: function (xhr) {
+                  // Standard Bearer Token authentication (Server must implement this)
+                  xhr.setRequestHeader('Authorization', 'Bearer ' + access_token);
+              },
+              success: function(res) {
+                  console.log('User Info Response:', res);
+                  $('#output_console').val(apiCall + '\n\n[RESPONSE BODY]\n' + JSON.stringify(res, null, 2));
+              },
+              error: function (xhr, status, error) {
+                  console.error("User Info Error:", xhr.responseText);
+                  $('#output_console').val(apiCall + `\n\n[ERROR: HTTP ${xhr.status} ${xhr.statusText}]\n` + xhr.responseText);
+                  alert("User Info Failed: Check console for error.");
+              }
+          });
+        }
+        
+        // Decodes the JWT payload from the ID Token. (Client-Side Utility)
+        function decodeIdToken() {
+            if (!id_token) {
+                alert("ID Token is missing. Run 'Get Token' first.");
+                return;
+            }
+
+            const parts = id_token.split('.');
+
+            if (parts.length !== 3) {
+                alert("Invalid ID Token format (expected 3 parts).");
+                return;
+            }
+
+            try {
+                const payload = JSON.parse(urlBase64Decode(parts[1]));
+                
+                const decodedClaims = {
+                    message: "--- DECODED ID TOKEN PAYLOAD (FOR TESTING ONLY - SIGNATURE NOT VALIDATED) ---",
+                    TokenExpiration: new Date(payload.exp * 1000).toLocaleString(),
+                    // Highlight the key claims
+                    UID: payload.uid, 
+                    Subject: payload.sub,
+                    ...payload
+                };
+                
+                $('#output_console').val('ID TOKEN DECODE SUCCESSFUL:\n\n' + JSON.stringify(decodedClaims, null, 2));
+
+            } catch (e) {
+                console.error("ID Token Decoding Error:", e);
+                alert("Failed to decode ID Token payload. See console for error.");
+            }
+        }
+        
+        // ----------------------------------------------------------------------
+        // ** SECURITY WARNING: THIS FUNCTION MUST RUN ON A SECURE SERVER **
+        // ----------------------------------------------------------------------
+        // Introspect (Verify Token Validity)
+        function introspect() {
+            var dataCenter = $('#dataCenter').val().replace('.gigya.com', '');
+            var apiKeyOp = $('#apiKeyOp').val();
+            var clientId = $('#client_id').val();
+            var clientSecret = $('#client_secret').val();
+
+            if (!access_token) {
+                alert('Access Token is required for introspection. Run "Get Token" first.');
+                return;
+            }
+            if (!clientId || !clientSecret) {
+                alert('Client ID and Secret are required for Introspection.');
+                return;
+            }
+
+            var introspectEndpointLink = `https://fidm.${dataCenter}.gigya.com/oidc/op/v1.0/${apiKeyOp}/introspect`;
+            var postData = `token=${encodeURIComponent(access_token)}`;
+
+            // --- API Call Logging ---
+            const apiCall = `POST ${introspectEndpointLink}`;
+            $('#output_console').val(`${apiCall}\n\n[RESPONSE BODY]\n`);
+            // --- End API Call Logging ---
+
+            $.ajax({
+                url: introspectEndpointLink,
+                type: 'POST',
+                crossDomain: true,
+                data: postData,
+                beforeSend: function (xhr) {
+                    // Introspection requires client authentication (Basic Auth header)
+                    xhr.setRequestHeader('Authorization', 'Basic ' + btoa(clientId + ":" + clientSecret));
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                },
+                success: function(res) {
+                    console.log('Introspection Result:', res);
+                    $('#output_console').val(apiCall + '\n\n[RESPONSE BODY]\n' + JSON.stringify(res, null, 2));
+                },
+                error: function (xhr, status, error) {
+                    console.error("Introspect Error:", xhr.responseText);
+                    $('#output_console').val(apiCall + `\n\n[ERROR: HTTP ${xhr.status} ${xhr.statusText}]\n` + xhr.responseText);
+                    alert("Introspect Failed: Check console for error.");
+                }
+            });
+        }
+        
+        // RP-Initiated Logout
+        function rpLogout() {
+            var dataCenter = $('#dataCenter').val().replace('.gigya.com', '');
+            var apiKeyOp = $('#apiKeyOp').val();
+            
+            // CONSTRUCT THE POST LOGOUT REDIRECT URI to the new cleanup page
+            // Logic: Get current page base path, append /OIDCLogoutPage.html
+            var currentBasePath = window.location.href.split('?')[0].split('#')[0];
+            var pathParts = currentBasePath.split('/');
+            // Remove the current page file name (RPIndexPage.html)
+            pathParts.pop(); 
+            // Join the path and append the new cleanup page name
+            var postLogoutRedirectUri = pathParts.join('/') + '/OIDCLogoutPage.html'; 
+
+            // Pass API Key and Data Center to the Post Logout Page for SDK loading and local cleanup
+            var logoutUrl = `https://fidm.${dataCenter}.gigya.com/oidc/op/v1.0/${apiKeyOp}/end_session?` +
+                `post_logout_redirect_uri=${encodeURIComponent(postLogoutRedirectUri + '?apiKey=' + apiKeyOp + '&dataCenter=' + dataCenter)}`;
+            
+            // Redirect the user's browser to the OIDC end_session endpoint
+            window.location = logoutUrl;
+        }
+
+        // --- Utility Functions ---
+        
+        function readToken() {
+            console.log('--- Current Token Values ---');
+            console.log('Access Token:', access_token);
+            console.log('Refresh Token:', refresh_token);
+            console.log('ID Token:', id_token);
+            alert('Token values logged to console.');
+        }
+        
+        // Full reset function
+        function resetTestPage() {
+            // Reset global variables
+            code = "";
+            access_token = "";
+            refresh_token = "";
+            id_token = "";
+            
+            // Clear inputs
+            $('#access_token_input').val('');
+            $('#refresh_token_input').val('');
+            $('#id_token_input').val('');
+            
+            // Clear outputs
+            $('#code').text('Code Received: N/A');
+            $('#access_token_type').text('');
+            $('#output_console').val('');
+            $('#warn').text('Test environment reset. Start Auth Flow from the main website.');
+
+            // Remove code from URL (cleans up the query string)
+            const url = window.location.href.split('?')[0];
+            window.history.pushState({}, '', url);
+        }
+
+      </script>
+    </head>
+    <body>
+    <div class="" id="main_wrapper">
+        <div class="" id="logoDiv">
+            <a id="logoHyperlink" href="https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html">
+                <!-- Using placeholder image to avoid external dependency -->
+                <img src="https://placehold.co/150x50/0070f2/ffffff?text=CDC+Demo" alt="CDC Demo Logo" />
+            </a>
+        </div>
+        <h2>SAP CDC OIDC Demo - RP Test Page</h2>
+        <p>This page simulates the **Chatbot Backend's** secure flow using client-side AJAX for testing.</p>
+
+        <!-- Configuration Inputs -->
+        <div class="input-group">
+            <label for="dataCenter">Data Center (DC):</label>
+            <input name="dataCenter" id="dataCenter" type="text" placeholder="us1.gigya.com" value="us1.gigya.com">
+        </div>
+        <div class="input-group">
+            <label for="apiKeyOp">OP Site API Key:</label>
+            <input name="apiKeyOp" id="apiKeyOp" type="text" placeholder="apiKeyOp" value="4_S2nqbib5zmlDXhDef3Yhbw">
+        </div>
+        <div class="input-group">
+            <label for="client_id">RP Client ID:</label>
+            <input id="client_id" type="text" placeholder="client id" value="YR03Nf-EABD3TuqbImtU1bPf">
+        </div>
+        <div class="input-group">
+            <label for="client_secret">RP Client Secret:</label>
+            <input id="client_secret" type="text" placeholder="client secret for token endpoint" value="">
+            <div class="server-side-logic">
+                <p>⚠️ **SECURITY ALERT:** The Client Secret should **NEVER** be exposed in client-side code. This is a secure server-side credential.</p>
+            </div>
+        </div>
+        
+        <hr>
+        
+        <!-- Step 1: Code Reception -->
+        <h3>1. Authorization Code Status</h3>
+        <h4 id="code"></h4>
+        <h4 id="warn"></h4>
+        
+        <!-- Step 2: Get Token -->
+        <h3>2. Exchange Code / Refresh Token (Server Simulation)</h3>
+        <div class="input-group">
+            <label for="grant_type">Grant Type:</label>
+            <select id="grant_type" type="text">
+                <option value="authorization_code">authorization_code</option>
+                <option value="refresh_token">refresh_token</option>
+            </select>
+        </div>
+        <input type="button" class="rpBtn" onclick="getTokenId()" value="Get Token / Refresh Token"/>
+        <h4 id="access_token_type"></h4>
+        
+        <div class="token-container">
+            <div class="token-input-group">
+                <label for="access_token_input">Access Token</label>
+                <div class="token-input-wrapper">
+                    <input type="text" id="access_token_input" placeholder="Access Token (Short-Lived)" readonly>
+                    <div class="copy-icon" onclick="copyText('access_token_input')" title="Copy to Clipboard">
+                        <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="token-input-group">
+                <label for="refresh_token_input">Refresh Token</label>
+                <div class="token-input-wrapper">
+                    <input type="text" id="refresh_token_input" placeholder="Refresh Token (Long-Lived)" readonly>
+                    <div class="copy-icon" onclick="copyText('refresh_token_input')" title="Copy to Clipboard">
+                        <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="token-input-group">
+                <label for="id_token_input">ID Token</label>
+                <div class="token-input-wrapper">
+                    <input type="text" id="id_token_input" placeholder="ID Token (Identity Claims)" readonly>
+                    <div class="copy-icon" onclick="copyText('id_token_input')" title="Copy to Clipboard">
+                        <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 3: Use Access Token -->
+        <h3>3. Identity Retrieval & Validation</h3>
+        <div class="btn-group">
+            <input type="button" class="rpBtn" onclick="getUserInfo()" value="Get User Info"/>
+            <input type="button" class="rpBtn" onclick="decodeIdToken()" value="Decode ID Token"/>
+        </div>
+        
+        <!-- Step 4: Introspection -->
+        <h3>4. Verify Token Validity (Introspection Simulation)</h3>
+        <input type="button" class="rpBtn" onclick="introspect()" value="Introspect Access Token"/>
+        
+        <!-- Unified Output Console -->
+        <h3>5. API Response / Decode Output</h3>
+        <textarea id="output_console" readonly></textarea>
+        
+        <!-- Extra Functionality for Reference -->
+        <h3>Utilities & Logout</h3>
+        <input type="button" class="rpBtn" onclick="readToken()" value="Log Tokens to Console"/>
+        
+        <input type="button" class="rpBtn logout-btn" onclick="rpLogout()" value="Logout (RP-SLO)"/>
+        <input type="button" class="rpBtn" onclick="resetTestPage()" value="Reset Test Page"/>
+
+    </div>
+    </body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="text/javascript" src="https://cdns.us1.gigya.com/js/gigya.js?apiKey=4_p214gTNZ7atoOa0vx14vuwZ">
+    </script>
+    <script>
+    function logoutWithOIC() {
+      gigya.accounts.logout({forceProvidersLogout: true,
+        callback: function(response) {
+
+          if ( response.errorCode == 0 ) {
+            alert('You are now logged out!');
+            document.getElementById('JStext').innerHTML = "Logged Out";
+            }
+            else {
+                alert('Error :' + response.errorMessage);
+            }
+        }
+      });
+    }
+    function loginWithOic() {
+
+      gigya.socialize.addEventHandlers({
+          onLogin:function(response) {
+            loginData = response;
+            returnedObject = JSON.stringify(loginData["user"], null, 4);
+            document.getElementById('JStext').innerHTML = returnedObject;
+            console.log(loginData);
+          }
+      });
+
+      var customButtons = [
+      	{
+          "type":"oidc",
+      		"providerName":"myop",
+      		"opName":"myop",
+      		"iconURL":"https://developers.gigya.com/download/attachments/14650851/OIDC_45.png",
+      		"logoURL":"",
+      		"lastLoginIconURL":"https://developers.gigya.com/download/attachments/14650851/OIDC_LastLogin_45.png",
+      		"position":1 // The position of this button in the Social Login widget. If not supplied, will default to 1 and the order they are defined in this array
+        }
+      ];
+      gigya.accounts.showScreenSet({"screenSet": "Default-RegistrationLogin", customButtons});
+    }
+</script>
+</head>
+<body>
+<input type="button" value="Login with OIC" onclick="loginWithOic();" />&nbsp;&nbsp;
+<input type="button" value="Logout with OIC" onclick="logoutWithOic();" />
+<br /><br />Response:
+<div class="responseDiv" id="responseDiv">
+    <textarea id="JStext" value="" style="background-color: #EFEFEF; width: 80%; max-width: 80%; border: 3px inset grey; min-height: 300px; overflow: auto; border-radius: 7px;"></textarea>
+</div>
+</body>
+</html>

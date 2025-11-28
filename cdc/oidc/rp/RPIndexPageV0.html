@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+    <head>
+      <title>demo.cdc.com | OIDC RP Site</title>
+      <link href="theme/css/maincss.css" rel="stylesheet" type="text/css"/>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+      <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script> -->
+
+      <script type="text/javascript">
+        var code = "";
+        var access_token_type = "";
+        var access_token = "";
+        var refresh_token = "";
+        var id_token = "";
+        var params = urlParams();
+        var apiDomain;
+
+        function loadGigya() {
+          var apiKey = $('#apiKey').val();
+          if (apiKey) {
+             $.getScript('//cdns.us1.gigya.com/js/gigya.js?apiKey=' + apiKey, function () {
+                 if (typeof (gigya) == 'undefined')
+                 {
+                     alert('gigya SDK is not loaded, see console log!');
+                     return;
+                 }
+             });
+          }
+        }
+
+        $(document).ready(function () {
+          loadGigya();
+        	$('input[type="text"]').change(function () {
+            loadGigya();
+          });
+          code=params['code'];
+          access_token = params['access_token'];
+          id_token = params['id_token'];
+          if (code)
+          {
+              $('#code').text('code: '+code);
+              $('#warn').text('Got a code, now u can reqest access_token');
+          }
+          else
+              $('#warn').text('No code! get it by Starting Auth flow');
+
+          if (access_token) {
+              $('#access_token').text('access_token: ' + access_token);
+          }
+
+          if (id_token) {
+              $('#id_token').text('id_token: ' + id_token);
+          }
+        });
+
+        function urlParams() {
+          var queryString;
+          if (location.hash) {
+              queryString = location.hash.substring(1);
+          } else {
+              queryString = location.search;
+              if (queryString.indexOf('?') > -1)
+                  queryString = queryString.substring(queryString.indexOf('?') + 1);
+          }
+          var queryParts = queryString.split(/&/);
+          var params = {};
+          for (var i = 0; i < queryParts.length; ++i) {
+              var param = queryParts[i];
+              if (param.indexOf('=') === -1)
+                  continue;
+              var paramParts = param.split('=');
+              if (paramParts.length !== 2)
+                  continue;
+              params[paramParts[0]] = decodeURIComponent(paramParts[1]);
+          }
+          return params;
+        }
+
+      </script>
+
+
+        <style type='text/css'>
+            /* ** --snipped-- ** */
+        </style>
+    </head>
+    <body>
+    <div class="" id="main_wrapper">
+        <div class="" id="logoDiv">
+            <a id="logoHyperlink" href="https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html">
+                <img src="theme/img/GigyaLogo_2016-05-04.png" />
+            </a>
+        </div>
+        <h2>SAP CDC OIDC Demo - RP Site</h2>
+        <p></p>
+        <div class="" id="loginOptions">
+          dataCenter: <input name="dataCenter" id="dataCenter" style="width: 300px" type="text" placeholder="us1.gigya.com" value="us1.gigya.com"></input><br />
+          apiKey: <input name="apiKey" id="apiKey" style="width: 300px" type="text" placeholder="apiKey" value="4_p214gTNZ7atoOa0vx14vuwZ"></input><span id="apiDomainDiv"></span><br />
+                    apiKeyOp: <input name="apiKeyOp" id="apiKeyOp" style="width: 300px" type="text" placeholder="apiKeyOp" value="4_S2nqbib5zmlDXhDef3Yhbw"></input><span id="apiOpDomainDiv"></span><br />
+          clientID: <input id="client_id" style="width: 300px" type="text" placeholder="client id" value="YR03Nf-EABD3TuqbImtU1bPf"></input><br/>
+          clientSecret: <input id="client_secret" style="width: 300px" type="text" placeholder="client secret for token endpoint" value=""></input><br/>
+          <input type="button" class="rpBtn" onclick="getCode()" value="Get Code"/>
+          <h4 id="code"></h4>
+          grant_type: <select id="grant_type" style="width: 300px" type="text">
+            <option value="authorization_code" >authorization_code</option>
+            <option value="refresh_token">refresh_token</option>
+          </select><br/>
+          <input type="button" class="rpBtn"onclick="getTokenId()" value="Get Token"/><br/>
+          <h4 id="access_token_type"></h4>
+          <h4 id="access_token"></h4>
+          <h4 id="refresh_token"></h4>
+          <input type="button" class="rpBtn" onclick="readToken()" value="Read User Info (JWT)"/>
+          <h4 id="blank"></h4>
+          <input type="button" class="rpBtn" onclick="introspect()" value="Verify Access Token (introspect)"/>
+          <h4 id="blank"></h4>
+          <input type="button" class="rpBtn"onclick="getUserInfo()" value="Get User Info"/>
+          <h4 id="id_token"></h4>
+          <h4 id="id_token_parsed"></h4>
+          <h4 id="user_info"></h4>
+          <input type="button" class="rpBtn" onclick="gigya.socialize.logout({callback: function(e) {document.getElementById('logoHyperlink').click();}})" value="JSSDK Logout"/>
+        </div>
+        <script>
+            //document.getElementById('codeBtn').disabled=true;
+            var redirectURL = "https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html";
+            var finalRedirectURL = "https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPLoggedInPage.php";
+            // Authorise
+            function getCode() {
+                var newNonce=Date.now();
+                var authorizeEndpointLink="https://fidm.us1.gigya.com/oidc/op/v1.0/" + $('#apiKeyOp').val() + "/authorize?client_id=" + encodeURIComponent($('#client_id').val()) + "&response_type=" + encodeURIComponent("code") + "&redirect_uri=" + encodeURIComponent(redirectURL) + "&scope=openid%20profile%20email%20phone%20uid%20username%20locale%20offline_access&prompt=login&display=page&nonce=" + newNonce;
+                window.location=authorizeEndpointLink;
+            }
+            // Get Token
+            function getTokenId() {
+              var tokenEndpointLink="";
+              if ($('#grant_type').val() === 'authorization_code') {
+                tokenEndpointLink = "https://fidm.us1.gigya.com/oidc/op/v1.0/" + $('#apiKeyOp').val() + "/token?grant_type=" + $('#grant_type').val() + "&code=" + encodeURIComponent(code) + "&redirect_uri=" + encodeURIComponent(redirectURL);
+              } else if ($('#grant_type').val() === 'refresh_token') {
+                tokenEndpointLink = "https://fidm.us1.gigya.com/oidc/op/v1.0/" + $('#apiKeyOp').val() + "/token?grant_type=" + $('#grant_type').val() + "&refresh_token=" + encodeURIComponent(refresh_token) + "&redirect_uri=" + encodeURIComponent(redirectURL) + "&expires_in=15";
+              }
+              $.ajax({
+                  url: tokenEndpointLink,
+                  type: 'POST',
+                  //async: false,
+                  crossDomain: true,
+                  xhrFields: {
+                      withCredentials: true
+                  },
+                  beforeSend: function (xhr) {
+                      xhr.setRequestHeader('Authorization', 'Basic ' + btoa($('#client_id').val() + ":" + $('#client_secret').val()));
+                  },
+                  success: function(res)
+                  {
+                    console.log(res);
+                      if (res.access_token)
+                      {
+                          access_token_type=res.token_type;
+                          access_token=res.access_token;
+                          refresh_token=res.refresh_token;
+                          $('#refresh_token').text('refresh_token: '+refresh_token);
+                          $('#access_token_type').text('access_token_type: '+access_token_type);
+                          $('#access_token').text('access_token: '+access_token);
+  						            $('#token').val(access_token);
+                          $('#warn').text('Very good!!!!! now reqest userInfo with access_token');
+                      }
+                      else if (res == '')
+                          alert("No response from server, maybe this tester's URL is not in allowed site domains?");
+                      else
+                          alert(JSON.stringify(res, null, '\t'));
+
+                      if (res.id_token) {
+                          id_token = res.id_token;
+                          // $('#id_token').text('id_token: ' + id_token);
+                          // $('#id_token_parsed').text('id_token_parsed: ' + Base64DecodeUrl(id_token.split('.')[1]));
+                          //window.location = finalRedirectURL + '?' + 'code=' + code + "&id_token=" + id_token;
+                      }
+                  },
+                  error: function (res)
+                  {
+                      alert(res.response);
+                  }
+              });
+            }
+            // Get user info
+            function getUserInfo() {
+              var userinfoEndpointLink = "https://fidm.us1.gigya.com/oidc/op/v1.0/" + $('#apiKeyOp').val() + "/userinfo?schema=openid" + "&response_type=id_token";
+              console.log(btoa(access_token));
+              $.ajax({
+                  url: userinfoEndpointLink,
+                  type: 'POST',
+                  //async: false,
+                  crossDomain: true,
+                  xhrFields: {
+                      withCredentials: true
+                  },
+                  beforeSend: function (xhr) {
+                      xhr.setRequestHeader('Authorization', 'Bearer ' + access_token);
+                  },
+                  success: function(res)
+                  {
+                    console.log(res);
+                      if (res.access_token)
+                      {
+                          access_token_type=res.access_token_type;
+                          access_token=res.access_token;
+                          refresh_token=res.refresh_token;
+                          $('#refresh_token').text('refresh_token: '+refresh_token);
+                          $('#access_token_type').text('access_token_type: '+access_token_type);
+                          $('#access_token').text('access_token: '+access_token);
+  						            $('#token').val(access_token);
+                          $('#warn').text('Very good!!!!! now reqest userInfo with access_token');
+                      }
+                      else if (res == '')
+                          alert("No response from server, maybe this tester's URL is not in allowed site domains?");
+                      else
+                          alert(JSON.stringify(res, null, '\t'));
+
+                      if (res.id_token) {
+                          id_token = res.id_token;
+                          // $('#id_token').text('id_token: ' + id_token);
+                          // $('#id_token_parsed').text('id_token_parsed: ' + Base64DecodeUrl(id_token.split('.')[1]));
+                          //window.location = finalRedirectURL + '?' + 'code=' + code + "&id_token=" + id_token;
+                      }
+                  },
+                  error: function (res)
+                  {
+                      alert(res.response);
+                  }
+              });
+            }
+            // Get user info
+            function introspect() {
+              var introspectEndpointLink = "https://fidm.us1.gigya.com/oidc/op/v1.0/" + $('#apiKeyOp').val() + "/introspect?token=" + encodeURIComponent(access_token);
+              console.log(btoa(access_token));
+              $.ajax({
+                  url: introspectEndpointLink,
+                  type: 'POST',
+                  //async: false,
+                  crossDomain: true,
+                  xhrFields: {
+                      withCredentials: true
+                  },
+                  beforeSend: function (xhr) {
+                      // xhr.setRequestHeader('Authorization', 'Bearer ' + access_token);
+                      xhr.setRequestHeader('Authorization', 'Basic ' + btoa($('#client_id').val() + ":" + $('#client_secret').val()));
+                      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                  },
+                  success: function(res)
+                  {
+                    if (res == '')
+                        alert("No response from server, maybe this tester's URL is not in allowed site domains?");
+                    else
+                        alert(JSON.stringify(res, null, '\t'));
+                      // if (res.access_token)
+                      // {
+                      //     access_token_type=res.access_token_type;
+                      //     access_token=res.access_token;
+                      //     refresh_token=res.refresh_token;
+                      //     $('#refresh_token').text('refresh_token: '+refresh_token);
+                      //     $('#access_token_type').text('access_token_type: '+access_token_type);
+                      //     $('#access_token').text('access_token: '+access_token);
+  						        //     $('#token').val(access_token);
+                      //     $('#warn').text('Very good!!!!! now reqest userInfo with access_token');
+                      // }
+                      // else if (res == '')
+                      //     alert("No response from server, maybe this tester's URL is not in allowed site domains?");
+                      // else
+                      //     alert(JSON.stringify(res, null, '\t'));
+                      //
+                      // if (res.id_token) {
+                      //     id_token = res.id_token;
+                      //     // $('#id_token').text('id_token: ' + id_token);
+                      //     // $('#id_token_parsed').text('id_token_parsed: ' + Base64DecodeUrl(id_token.split('.')[1]));
+                      //     //window.location = finalRedirectURL + '?' + 'code=' + code + "&id_token=" + id_token;
+                      // }
+                  },
+                  error: function (res)
+                  {
+                      alert(res.response);
+                  }
+              });
+            }
+            // Read JWT
+            function readToken() {
+                // window.location = finalRedirectURL + '?' + 'code=' + code + "&id_token=" + id_token;
+                newwindow=window.open(finalRedirectURL + '?' + 'code=' + code + "&id_token=" + id_token + "&apikey=" + $('#apiKey').val() + "&dataCenter=" + $('#dataCenter').val(), 'name', 'height=200,width=150');
+                if (window.focus) {newwindow.focus()}
+                return false;
+            }
+            //$(document).on("click", "#codeBtn", function() {
+            //    window.location="index_code.php";
+            //});
+            // $(document).on("click", "#codeBtn", function() {
+            //     window.location="index_code2.php";
+            // });
+        </script>
+    </div><!-- /main_wrapper -->
+    </body>
+</html>
