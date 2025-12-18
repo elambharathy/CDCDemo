@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -7,13 +8,34 @@
   <title>SAP CDC CIAM Tester (Embedded)</title>
 
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-  
+  <!-- CDP Initialization -->
+  <script src="https://cdns.cdp.gigya.com/websdk.js"></script>
+  <script>
+    // Global variable to hold the CDP SDK instance
+    window.CDP = null;
+
+    // Initialize the CDP SDK
+    // NOTE: Based on your saved info, the API Domain is set to 'EU5'
+    gigya.cdp.init({
+      apiDomain: 'EU5', // Match your CDP deployment (e.g., EU5)
+      bUnitId: '4_oiR7p-O14r6hxKkha3okAA', // REPLACE with your actual Business Unit ID
+      appId: 'HI3ATqQucBfWxVLOYIm2zQ' // REPLACE with your actual Application ID
+    })
+      .then(function (sdk) {
+        window.CDP = sdk;
+        console.log('SAP CDP SDK initialized successfully.');
+      })
+      .catch(function (error) {
+        console.error('SAP CDP SDK failed to initialize:', error);
+      });
+  </script>
   <script type="text/javascript" lang="javascript" src="cdcsite.js"></script>
   <link rel="stylesheet" href="cdcsite.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
 
   <header class="header">
@@ -34,12 +56,12 @@
     <div id="welcome-section" class="welcome-block">
       <h1>Manage Your Account Anytime, Anywhere.</h1>
       <p>Select an action below to test the SAP CDC screensets.</p>
-      
+
       <div class="action-buttons">
         <span class="notloggedin">
-          <button class="btn" onclick="showLogin()">Login/Register</button> 
-          <button class="btn" onclick="showIdentifierFirst()">Passwordless Login</button> 
-          <button class="btn btn-primary" onclick="Orgregistration()">Register B2B Organization</button> 
+          <button class="btn" onclick="showLogin()">Login/Register</button>
+          <button class="btn" onclick="showIdentifierFirst()">Passwordless Login</button>
+          <button class="btn btn-primary" onclick="Orgregistration()">Register B2B Organization</button>
         </span>
         <span class="loggedin">
           <button class="btn" onclick="profileupdate()">Update Profile</button>
@@ -47,7 +69,7 @@
         </span>
       </div>
     </div>
-    
+
     <div id="gigya-form-container" class="form-container">
       <button class="close-form-btn" onclick="closeForm()" title="Close Form">×</button>
     </div>
@@ -73,12 +95,12 @@
         <button class="btn-small" onclick="openKAS()">Open KAS (SAML)</button>
       </div>
     </div>
-    
+
     <div class="advanced-actions loggedin">
-        <h3>OIDC Authorization Code Flow Test (For Refresh Token)</h3>
-        <div class="action-buttons-secondary">
-            <button class="btn btn-primary" onclick="startOidcFlow()">Start OIDC Flow (Get Auth Code)</button>
-        </div>
+      <h3>OIDC Authorization Code Flow Test (For Refresh Token)</h3>
+      <div class="action-buttons-secondary">
+        <button class="btn btn-primary" onclick="startOidcFlow()">Start OIDC Flow (Get Auth Code)</button>
+      </div>
     </div>
 
     <div class="response-area loggedin">
@@ -87,18 +109,18 @@
     </div>
 
   </main>
-  
+
   <div id="settingsModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeSettings()">&times;</span>
       <h2>CDC Tester Settings</h2>
       <p>Settings are saved locally in your browser.</p>
-      
+
       <div class="form-group">
         <label for="settingApiKey">Site API Key:</label>
         <input type="text" id="settingApiKey" placeholder="Enter your site API Key (e.g., 4_7M0...)">
       </div>
-      
+
       <div class="form-group">
         <label for="settingDataCenter">Data Center (DC) Code:</label>
         <input type="text" id="settingDataCenter" value="us1" placeholder="e.g., us1, eu1, eu5">
@@ -110,9 +132,10 @@
         <label for="settingOidcClientId">OIDC Client ID (for Chatbot Backend):</label>
         <input type="text" id="settingOidcClientId" placeholder="Enter Client ID from CDC Console">
         <label for="settingOidcRedirectUri">OIDC Redirect URI (Must be registered in CDC Console):</label>
-        <input type="text" id="settingOidcRedirectUri" value="https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html" placeholder="Your backend callback URL"> 
+        <input type="text" id="settingOidcRedirectUri" value="https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html"
+          placeholder="Your backend callback URL">
       </div>
-      
+
       <hr>
       <h3>ScreenSet Configuration</h3>
 
@@ -124,7 +147,7 @@
         <label for="settingSessionExpiration">Session Expiration (seconds):</label>
         <input type="number" id="settingSessionExpiration" value="120" placeholder="e.g., 120">
       </div>
-      
+
       <div class="form-group">
         <label for="settingIdentifierScreenSet">Passwordless ScreenSet (Identifier-First):</label>
         <input type="text" id="settingIdentifierScreenSet" value="Default-IdentifierFirst">
@@ -142,16 +165,17 @@
         <label for="settingProfileScreenSet">Profile Update ScreenSet:</label>
         <input type="text" id="settingProfileScreenSet" value="Default-ProfileUpdate">
         <label for="settingProfileStartScreen">Profile Update Start Screen:</label>
-        <input type="text" id="settingProfileStartScreen" value="gigya-update-profile-screen"> 
+        <input type="text" id="settingProfileStartScreen" value="gigya-update-profile-screen">
       </div>
 
       <button onclick="saveSettings()" class="modal-save-btn">Save and Reload SDK</button>
       <button onclick="resetSettings()" class="modal-reset-btn">Reset All Settings</button>
     </div>
   </div>
-  
+
   <footer class="footer">
     <div class="copy">&copy; 2025 CDC Tester</div>
   </footer>
 </body>
+
 </html>

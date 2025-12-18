@@ -9,8 +9,8 @@
 let cdcSettings = {
     apiKey: '',
     dataCenter: 'us1', // NEW: Explicit Data Center setting, defaulting to 'us1'
-    oidcClientId: 'YR03Nf-EABD3TuqbImtU1bPf', 
-    oidcRedirectUri: 'https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html', 
+    oidcClientId: 'YR03Nf-EABD3TuqbImtU1bPf',
+    oidcRedirectUri: 'https://elamdemo.fwh.is/sap/cdc/oidc/rp/RPIndexPage.html',
     // Login/Register
     loginScreenSet: 'Default-RegistrationLogin',
     loginStartScreen: 'gigya-login-screen',
@@ -43,7 +43,7 @@ let lastGigyaResponse = null; // Store the last response for JWT decoding
 function log(level, ...messages) {
     const timestamp = new Date().toLocaleTimeString();
     const prefix = `${timestamp}: [${level.toUpperCase()}]`;
-    
+
     // Process messages to handle objects correctly
     const formattedMessages = messages.map(msg => {
         if (typeof msg === 'object' && msg !== null) {
@@ -70,7 +70,7 @@ function log(level, ...messages) {
 
 var onGigyaServiceReady = function () {
     log('log', 'Gigya Service is Ready.');
-    gigyaSDKLoaded = true; 
+    gigyaSDKLoaded = true;
 
     // Add global event handlers
     gigya.accounts.addEventHandlers({
@@ -86,13 +86,13 @@ var onGigyaServiceReady = function () {
 
     gigya.accounts.session.verify({
         callback: function (response) {
-            lastGigyaResponse = response; 
-            
+            lastGigyaResponse = response;
+
             if (response.errorCode == 0) {
                 // Session is valid
                 log('log', 'Valid session found. Getting account info to display data...');
                 // Manually call getAccountInfo to fetch and display user data
-                getAccountInfoManual(); 
+                getAccountInfo();
                 setLoginState(true);
             } else {
                 // Session is not valid (or user not logged in)
@@ -108,14 +108,19 @@ var onGigyaServiceReady = function () {
  */
 function onLoginCallback(evt) {
     // FIX APPLIED: 'evt' object will now be stringified for console output
-    log('log', 'onLogin event fired. Event Details:', evt); 
+    log('log', 'onLogin event fired. Event Details:', evt);
     lastGigyaResponse = evt; // Store response
     setLoginState(true);
     // Note: Since we are using popup, no need to explicitly call closeForm() here, 
     // but we can ensure the embedded container is hidden
-    $("#" + FORM_CONTAINER_ID).hide(); 
+    $("#" + FORM_CONTAINER_ID).hide();
     // After successful login, fetch the full account data and display it
-    getAccountInfoManual();
+    getAccountInfo();
+    if (window.CDP) {
+        CDP.report('Web Events', { eventName: "WebLogin" })
+            .then(() => log('log', 'Reported WebLogin event to CDP.'))
+            .catch(error => log('error', 'CDP WebLogin report failed:', error));
+    }
 }
 
 /**
@@ -127,14 +132,20 @@ function onLogoutCallback(evt) {
     setLoginState(false);
     closeForm(); // Hide embedded form/show welcome
     displayResponse(evt);
+    // Report logout event to CDP if available
+    if (window.CDP) {
+        CDP.report('Web Events', { eventName: "WebLogout" })
+            .then(() => log('log', 'Reported WebLogout event to CDP.'))
+            .catch(error => log('error', 'CDP WebLogout report failed:', error));
+    }
 }
 
 // ---------------------------------------------------------------------------
 // 4. PAGE LOAD & SDK INITIALIZATION
 // ---------------------------------------------------------------------------
 
-document.addEventListener("DOMContentLoaded", function() {
-    loadSettings(); 
+document.addEventListener("DOMContentLoaded", function () {
+    loadSettings();
 
     if (cdcSettings.apiKey) {
         log('log', 'API key found. Loading Gigya SDK...');
@@ -153,24 +164,24 @@ function loadGigyaSDK(apiKey) {
     if (document.querySelector('script[src*="gigya.js"]')) {
         return;
     }
-    
+
     // --- USING EXPLICIT DATA CENTER SETTING ---
     const dataCenter = cdcSettings.dataCenter;
-    
+
     // Set the global Data Center variable for Gigya API calls
     window.gigyaCmsFunctions = { dataCenter: dataCenter };
-    
+
     const scriptSrc = `https://cdns.${dataCenter}.gigya.com/js/gigya.js?apikey=${apiKey}`;
-    
+
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.lang = 'javascript';
     script.src = scriptSrc;
-    
+
     log('log', `[SDK Loader] Using configured Data Center: ${dataCenter}`);
     log('log', `[SDK Loader] Attempting to load SDK from: ${scriptSrc}`); // Log the exact URL being used
 
-    script.onerror = function() {
+    script.onerror = function () {
         log('error', '--- GIGYA SDK LOAD FAILED ---');
         log('error', `Attempted URL: ${scriptSrc}`);
         log('error', 'Possible Causes: 1. Incorrect API Key. 2. Incorrect Data Center (DC) configured. 3. The local URL is NOT a Trusted Site URL in your CDC console.');
@@ -184,22 +195,22 @@ function loadGigyaSDK(apiKey) {
 
 function openSettings() {
     document.getElementById('settingApiKey').value = cdcSettings.apiKey;
-    document.getElementById('settingDataCenter').value = cdcSettings.dataCenter; 
+    document.getElementById('settingDataCenter').value = cdcSettings.dataCenter;
     document.getElementById('settingOidcClientId').value = cdcSettings.oidcClientId;
     document.getElementById('settingOidcRedirectUri').value = cdcSettings.oidcRedirectUri;
-    
+
     document.getElementById('settingLoginScreenSet').value = cdcSettings.loginScreenSet;
     document.getElementById('settingLoginStartScreen').value = cdcSettings.loginStartScreen;
     document.getElementById('settingSessionExpiration').value = cdcSettings.sessionExpiration;
-    
+
     document.getElementById('settingIdentifierScreenSet').value = cdcSettings.identifierScreenSet;
     document.getElementById('settingIdentifierStartScreen').value = cdcSettings.identifierStartScreen;
-    
+
     document.getElementById('settingRegScreenSet').value = cdcSettings.regScreenSet;
     document.getElementById('settingRegStartScreen').value = cdcSettings.regStartScreen;
     document.getElementById('settingProfileScreenSet').value = cdcSettings.profileScreenSet;
     document.getElementById('settingProfileStartScreen').value = cdcSettings.profileStartScreen;
-    
+
     document.getElementById('settingsModal').style.display = 'block';
 }
 
@@ -209,19 +220,19 @@ function closeSettings() {
 
 function saveSettings() {
     cdcSettings.apiKey = document.getElementById('settingApiKey').value.trim();
-    cdcSettings.dataCenter = document.getElementById('settingDataCenter').value.trim().toLowerCase(); 
+    cdcSettings.dataCenter = document.getElementById('settingDataCenter').value.trim().toLowerCase();
     cdcSettings.oidcClientId = document.getElementById('settingOidcClientId').value.trim();
     cdcSettings.oidcRedirectUri = document.getElementById('settingOidcRedirectUri').value.trim();
-    
+
     cdcSettings.loginScreenSet = document.getElementById('settingLoginScreenSet').value.trim();
     cdcSettings.loginStartScreen = document.getElementById('settingLoginStartScreen').value.trim();
     // NEW: Session Expiration
     const expValue = document.getElementById('settingSessionExpiration').value.trim();
-    cdcSettings.sessionExpiration = parseInt(expValue) > 0 ? parseInt(expValue) : 120; 
+    cdcSettings.sessionExpiration = parseInt(expValue) > 0 ? parseInt(expValue) : 120;
 
     cdcSettings.identifierScreenSet = document.getElementById('settingIdentifierScreenSet').value.trim();
     cdcSettings.identifierStartScreen = document.getElementById('settingIdentifierStartScreen').value.trim();
-    
+
     cdcSettings.regScreenSet = document.getElementById('settingRegScreenSet').value.trim();
     cdcSettings.regStartScreen = document.getElementById('settingRegStartScreen').value.trim();
     cdcSettings.profileScreenSet = document.getElementById('settingProfileScreenSet').value.trim();
@@ -295,11 +306,11 @@ function displayResponse(response) {
  */
 function showForm(params) {
     if (!checkGigyaLoaded()) return;
-    
+
     // MODIFIED: Use display: 'popup'
     const screenSetParams = {
         ...params,
-        display: 'popup' 
+        display: 'popup'
     };
 
     // Keep the embedded form container hidden since we're using popup
@@ -355,7 +366,7 @@ function profileupdate() {
 
 function SetOrganizationContext() {
     showForm({
-		screenSet: cdcSettings.regScreenSet, // Assuming it's in this screenset
+        screenSet: cdcSettings.regScreenSet, // Assuming it's in this screenset
         startScreen: 'gigya-change-organization-context-screen'
     });
 };
@@ -372,28 +383,70 @@ function logout() {
  */
 function getAccountInfoManual() {
     if (!checkGigyaLoaded()) return;
-    
+
     const dataCenter = cdcSettings.dataCenter;
     const requestUrl = `https://accounts.${dataCenter}.gigya.com/accounts.getAccountInfo`;
-    
+
     displayResponse({
-        message: "Calling accounts.getAccountInfo...", 
+        message: "Calling accounts.getAccountInfo...",
         RequestURL: requestUrl // API Key and query params are stripped for clarity
     });
 
     gigya.accounts.getAccountInfo({
         include: 'profile,data,groups',
-        callback: function(response) {
+        callback: function (response) {
             lastGigyaResponse = response;
-            
+
             const fullResponse = {
                 message: "Response from accounts.getAccountInfo",
                 RequestURL: requestUrl,
                 ...response
             }
             displayResponse(fullResponse);
-            // FIX APPLIED: 'response' object will now be stringified for console output
-            log('log', 'getAccountInfoManual response:', response); 
+            log('log', 'getAccountInfo Manual response:', response);
+            // REPORT TO CDP IF AVAILABLE
+            if (window.CDP && response.errorCode === 0) {
+                const uid = response.UID;
+                if (uid) {
+                    // Send User Attributes to CDP
+                    const userAttributes = {
+                        uid: uid,
+                        email: response.profile ? response.profile.email : null,
+                        firstName: response.profile ? response.profile.firstName : null,
+                        eventName: "getAccount"
+                    };
+                    CDP.report('Web Events', userAttributes)
+                        .then(() => log('log', 'Reported getAccount to CDP'))
+                        .catch(error => log('error', 'CDP getAccount report failed:', error));
+                }
+            }
+        }
+    });
+}
+
+function getAccountInfo() {
+    if (!checkGigyaLoaded()) return;
+
+    const dataCenter = cdcSettings.dataCenter;
+    const requestUrl = `https://accounts.${dataCenter}.gigya.com/accounts.getAccountInfo`;
+
+    displayResponse({
+        message: "Calling accounts.getAccountInfo...",
+        RequestURL: requestUrl // API Key and query params are stripped for clarity
+    });
+
+    gigya.accounts.getAccountInfo({
+        include: 'profile,data,groups',
+        callback: function (response) {
+            lastGigyaResponse = response;
+
+            const fullResponse = {
+                message: "Response from accounts.getAccountInfo",
+                RequestURL: requestUrl,
+                ...response
+            }
+            displayResponse(fullResponse);
+            log('log', 'getAccountInfo response:', response);
         }
     });
 }
@@ -403,19 +456,19 @@ function getAccountInfoManual() {
  */
 function verifySessionManual() {
     if (!checkGigyaLoaded()) return;
-    
+
     const dataCenter = cdcSettings.dataCenter;
     const requestUrl = `https://accounts.${dataCenter}.gigya.com/accounts.session.verify`;
-    
+
     displayResponse({
-        message: "Calling accounts.session.verify...", 
+        message: "Calling accounts.session.verify...",
         RequestURL: requestUrl // API Key and query params are stripped for clarity
     });
 
     gigya.accounts.session.verify({
-        callback: function(response) {
+        callback: function (response) {
             lastGigyaResponse = response;
-            
+
             const fullResponse = {
                 message: "Response from accounts.session.verify",
                 RequestURL: requestUrl,
@@ -424,6 +477,15 @@ function verifySessionManual() {
             displayResponse(fullResponse);
             // FIX APPLIED: 'response' object will now be stringified for console output
             log('log', 'verifySessionManual response:', response);
+
+            if (window.CDP && response.errorCode === 0) {
+                CDP.report('Web Events', {
+                    eventName: "VerifySession",
+                    browser: navigator.userAgent
+                })
+                    .then(() => log('log', 'Reported VerifySession event to CDP.'))
+                    .catch(error => log('error', 'CDP VerifySession report failed:', error));
+            }
         }
     });
 }
@@ -437,7 +499,7 @@ function getJWT() {
     if (!checkGigyaLoaded()) return;
     gigya.accounts.getJWT({
         fields: "UID,firstName,lastName,email", // Requesting UID explicitly
-        callback: function(response) {
+        callback: function (response) {
             lastGigyaResponse = response; // Store for decoding
             displayResponse(response);
             if (response.id_token) {
@@ -462,7 +524,7 @@ function urlBase64Decode(str) {
             throw new Error('Illegal base64url string!');
     }
     // Use window.atob and decodeURIComponent to handle special characters correctly
-    return decodeURIComponent(window.atob(output).split('').map(function(c) {
+    return decodeURIComponent(window.atob(output).split('').map(function (c) {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
 }
@@ -488,7 +550,7 @@ function decodeAndDisplayJWT() {
     try {
         const header = JSON.parse(urlBase64Decode(parts[0]));
         const payload = JSON.parse(urlBase64Decode(parts[1]));
-        
+
         const decodedClaims = {
             message: "--- DECODED JWT PAYLOAD (FOR TESTING ONLY - SIGNATURE NOT VALIDATED) ---",
             TokenExpiration: new Date(payload.exp * 1000).toLocaleString(),
@@ -518,7 +580,7 @@ function startOidcFlow() {
     const apiKey = cdcSettings.apiKey;
     const clientId = cdcSettings.oidcClientId;
     const redirectUri = encodeURIComponent(cdcSettings.oidcRedirectUri);
-    
+
     // --- USING EXPLICIT DATA CENTER SETTING ---
     const dataCenter = cdcSettings.dataCenter;
 
@@ -574,7 +636,7 @@ function showAuthorization() {
                 "appId": "PLGPF8LX8J2ZB0OUV8WE", // TODO: Parameterize this in settings?
                 "callback": displayResponse
             }
-            gigya.accounts.b2b.auth.getAssets(params); 
+            gigya.accounts.b2b.auth.getAssets(params);
         }
     });
 }
@@ -590,7 +652,7 @@ function showKASAuthorization() {
                 return;
             }
             var params = {
-                "orgId": event.groups.organizations[0].orgId, 
+                "orgId": event.groups.organizations[0].orgId,
                 "appId": "PX6FZX7ZCKWRUWOGIONH", // TODO: Parameterize this in settings?
                 "callback": displayResponse
             }
@@ -601,8 +663,8 @@ function showKASAuthorization() {
 
 function openKAS() {
     if (!checkGigyaLoaded()) return;
-    gigya.fidm.saml.initSSO({ 
+    gigya.fidm.saml.initSSO({
         'spName': 'saml-kas_stage1', // TODO: Parameterize this in settings?
-        'redirectURL': 'https://Defaulteu--uat.sandbox.my.salesforce.com' 
+        'redirectURL': 'https://Defaulteu--uat.sandbox.my.salesforce.com'
     });
 };
