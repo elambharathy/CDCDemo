@@ -641,30 +641,10 @@ function showAuthorization() {
     });
 }
 
-function showKASAuthorization() {
-    if (!checkGigyaLoaded()) return;
-    gigya.accounts.getAccountInfo({
-        include: 'groups,profile',
-        callback: function (event) {
-            lastGigyaResponse = event; // Store response
-            if (event.errorCode !== 0 || !event.groups || !event.groups.organizations) {
-                alert('Could not get organization ID. Are you logged in as a B2B user?');
-                return;
-            }
-            var params = {
-                "orgId": event.groups.organizations[0].orgId,
-                "appId": "PX6FZX7ZCKWRUWOGIONH", // TODO: Parameterize this in settings?
-                "callback": displayResponse
-            }
-            gigya.accounts.b2b.auth.getAssets(params);
-        }
-    });
-}
-
-function openKAS() {
+function openApp1() {
     if (!checkGigyaLoaded()) return;
     gigya.fidm.saml.initSSO({
-        'spName': 'saml-kas_stage1', // TODO: Parameterize this in settings?
+        'spName': 'saml-app_stage1', // TODO: Parameterize this in settings?
         'redirectURL': 'https://Defaulteu--uat.sandbox.my.salesforce.com'
     });
 };
