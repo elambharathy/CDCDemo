@@ -211,8 +211,8 @@
 function startCodeFlow() {
     $url = "https://fidm.us1.gigya.com/oidc/op/v1.0/4_p214gTNZ7atoOa0vx14vuwZ/token";
     $authHeader="Basic ";
-    $clientID = "YR03Nf-EABD3TuqbImtU1bPf";
-    $clientSecret="eSuNe3GCit71PRl04JJRXMdq0uBiGbuAMOJDVbd9DC56jbu2am_iRiLyC3He_bqs3Ky6fL0s5WfBuydb9L77og";
+    $clientID = "YR03Nf";
+    $clientSecret="111";
     $hashedAuthString=base64_encode($clientID . ":" . $clientSecret);
     $authHeader .= $hashedAuthString;
     //echo $authHeader;  //EXPOSING THIS EXPOSES THE CLIENT SECRET TO THE CLIENT!!!
